@@ -45,3 +45,15 @@ php artisan boost:install
 
 Boost replaces these bootstrap instructions with guidelines tailored to the application. After installation, read `AGENTS.md` again and continue with the user's original request using the generated guidelines.
 </laravel-boost-guidelines>
+
+## House conventions (Inside The Build)
+
+- **Comments:** new MCP tool/server code carries anatomy comments — each
+  attribute/method states its role in the call lifecycle (name = lookup key,
+  description = routing decision, schema = inputSchema, handle = the code
+  that runs). Keep them when editing.
+- **Formatting:** run `./vendor/bin/pint` before every commit.
+- **Audit:** every tool call writes `mcp_audit_log` via
+  `App\Mcp\Support\McpAudit::record()` — including refusals and no-ops.
+- **Two-phase writes:** destructive actions draft via a `pending` row; only
+  `approved_at` (set by artisan, never through MCP) unlocks execution.

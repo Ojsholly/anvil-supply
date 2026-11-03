@@ -29,6 +29,8 @@ class GetOrderTool extends Tool
             ->first();
 
         if (! $order) {
+            \App\Mcp\Support\McpAudit::record('get-order', $request->all(), "not found: {$request->string('order_number')}");
+
             return Response::text("No order found for number {$request->string('order_number')}. Check the format — order numbers look like AS-1044.");
         }
 
@@ -62,6 +64,8 @@ class GetOrderTool extends Tool
                 $refund->reason ?? 'no reason recorded',
             );
         }
+
+        \App\Mcp\Support\McpAudit::record('get-order', $request->all(), "order {$order->number} returned");
 
         return Response::text(implode("\n", $lines));
     }

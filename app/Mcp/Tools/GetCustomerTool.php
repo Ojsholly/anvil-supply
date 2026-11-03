@@ -32,6 +32,8 @@ class GetCustomerTool extends Tool
             ->get();
 
         if ($customers->isEmpty()) {
+            \App\Mcp\Support\McpAudit::record('get-customer', $request->all(), '0 customers matched');
+
             return Response::text('No customers matched.');
         }
 
@@ -48,6 +50,8 @@ class GetCustomerTool extends Tool
         $prefix = $customers->count() > 1
             ? $customers->count()." matches — disambiguate before answering:\n"
             : '';
+
+        \App\Mcp\Support\McpAudit::record('get-customer', $request->all(), $customers->count().' customer(s) matched');
 
         return Response::text($prefix.$lines->join("\n"));
     }

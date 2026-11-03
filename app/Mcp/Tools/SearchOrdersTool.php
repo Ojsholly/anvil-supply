@@ -37,6 +37,8 @@ class SearchOrdersTool extends Tool
             ->get();
 
         if ($orders->isEmpty()) {
+            \App\Mcp\Support\McpAudit::record('search-orders', $request->all(), '0 orders matched');
+
             return Response::text('No orders matched that search.');
         }
 
@@ -49,6 +51,8 @@ class SearchOrdersTool extends Tool
             $o->total_cents / 100,
             $o->placed_at?->toDateString() ?? 'unplaced',
         ));
+
+        \App\Mcp\Support\McpAudit::record('search-orders', $request->all(), $orders->count().' order(s) matched');
 
         return Response::text($lines->join("\n"));
     }

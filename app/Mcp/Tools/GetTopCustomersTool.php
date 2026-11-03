@@ -45,7 +45,11 @@ class GetTopCustomersTool extends Tool
             ->get();
 
         if ($rows->isEmpty()) {
-            return Response::text('No customers with orders found.');
+            \App\Mcp\Support\McpAudit::record('get-top-customers', $request->all(), '0 customers with orders');
+
+            \App\Mcp\Support\McpAudit::record('get-top-customers', $request->all(), $rows->count().' customer(s) ranked');
+
+        return Response::text('No customers with orders found.');
         }
 
         $lines = $rows->values()->map(fn ($r, $i) => sprintf(

@@ -35,7 +35,7 @@ class IssueRefundTool extends Tool
         $order = Order::with('refunds')->where('number', $orderNumber)->first();
 
         if (! $order) {
-            return Response::error("No order found for number {$orderNumber}.");
+            return $this->deny($orderNumber, $request->all(), "No order found for number {$orderNumber}.");
         }
 
         // A repeat call carrying a key the client already used replays the
@@ -55,30 +55,30 @@ class IssueRefundTool extends Tool
 
         // Status guardrails — what the server itself refuses.
         if ($order->status === 'cancelled') {
-            return Response::error("Order {$orderNumber} is cancelled — it was never charged, nothing to refund.");
+            return $this->deny($orderNumber, $request->all(), "Order {$orderNumber} is cancelled — it was never charged, nothing to refund.");
         }
         if ($order->status === 'pending') {
-            return Response::error("Order {$orderNumber} is unpaid (status: pending) — nothing has been charged.");
+            return $this->deny($orderNumber, $request->all(), "Order {$orderNumber} is unpaid (status: pending) — nothing has been charged.");
         }
 
         $refundedCents = $order->refunds->sum('amount_cents');
         $remainingCents = $order->total_cents - $refundedCents;
         if ($remainingCents <= 0) {
-            return Response::error("Order {$orderNumber} is already fully refunded — double refunds are refused.");
+            return $this->deny($orderNumber, $request->all(), "Order {$orderNumber} is already fully refunded — double refunds are refused.");
         }
 
         $amountCents = $request->integer('amount_cents') ?: $remainingCents;
         if ($amountCents <= 0) {
-            return Response::error('Refund amount must be a positive number of cents.');
+            return $this->deny($orderNumber, $request->all(), 'Refund amount must be a positive number of cents.');
         }
         if ($amountCents > self::MAX_REFUND_CENTS) {
-            return Response::error(sprintf(
+            return $this->deny($orderNumber, $request->all(), sprintf(
                 'Refund exceeds the $%.2f per-call cap — larger refunds need a human operator.',
                 self::MAX_REFUND_CENTS / 100
             ));
         }
         if ($amountCents > $remainingCents) {
-            return Response::error(sprintf(
+            return $this->deny($orderNumber, $request->all(), sprintf(
                 'Only $%.2f is still refundable on %s — refused to refund $%.2f.',
                 $remainingCents / 100,
                 $orderNumber,
@@ -98,6 +98,11 @@ class IssueRefundTool extends Tool
             $order->update(['status' => 'refunded']);
         }
 
+        \App\Mcp\Support\McpAudit::record('issue-refund', $request->all(), sprintf(
+            'refunded $%.2f on %s (refund #%d)',
+            $amountCents / 100, $orderNumber, $refund->id
+        ));
+
         return Response::text(sprintf(
             'Refund $%.2f recorded on %s (refund #%d). %s',
             $amountCents / 100,
@@ -105,6 +110,15 @@ class IssueRefundTool extends Tool
             $refund->id,
             $order->status === 'refunded' ? 'Order fully refunded.' : 'Partial refund — order status unchanged.'
         ));
+    }
+
+    // Refusals are audited too — an over-cap or double-refund attempt
+    // leaves a row, not silence.
+    protected function deny(string $orderNumber, array $arguments, string $message): Response
+    {
+        \App\Mcp\Support\McpAudit::record('issue-refund', $arguments, 'refused: '.$message);
+
+        return Response::error($message);
     }
 
     /**

@@ -8,8 +8,11 @@ use Illuminate\JsonSchema\Types\Type;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
 
+// Lookup key — tools/call addresses the tool by this string.
+#[Name('get-customer')]
 // What the model reads to decide whether this tool answers its question.
 #[Description('Look up customers by name or email. Names are NOT unique — this tool may return several people; always confirm which one is meant (company or email) before reporting their orders.')]
 class GetCustomerTool extends Tool

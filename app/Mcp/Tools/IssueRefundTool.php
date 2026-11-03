@@ -20,27 +20,76 @@ use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
 #[IsDestructive]
 class IssueRefundTool extends Tool
 {
+    // Server-side hard cap per call — the client confirm-click is a
+    // courtesy; this check is the boundary.
+    public const MAX_REFUND_CENTS = 50000; // $500
+
     /**
      * The only code that executes on a call — eloquent in, text out.
+     * Every refusal path returns Response::error() so the model
+     * reads it as a failed call, not a successful answer.
      */
     public function handle(Request $request): Response
     {
-        $order = Order::with('refunds')
-            ->where('number', $request->string('order_number'))
-            ->first();
+        $orderNumber = (string) $request->string('order_number');
+        $order = Order::with('refunds')->where('number', $orderNumber)->first();
 
         if (! $order) {
-            return Response::text("No order found for number {$request->string('order_number')}.");
+            return Response::error("No order found for number {$orderNumber}.");
+        }
+
+        // A repeat call carrying a key the client already used replays the
+        // stored refund instead of charging the customer a second time.
+        $key = (string) $request->string('idempotency_key');
+        if ($key !== '') {
+            $existing = $order->refunds->firstWhere('idempotency_key', $key);
+            if ($existing) {
+                return Response::text(sprintf(
+                    'Idempotent replay — refund #%d for $%.2f on %s was already recorded. No second charge.',
+                    $existing->id,
+                    $existing->amount_cents / 100,
+                    $orderNumber
+                ));
+            }
+        }
+
+        // Status guardrails — what the server itself refuses.
+        if ($order->status === 'cancelled') {
+            return Response::error("Order {$orderNumber} is cancelled — it was never charged, nothing to refund.");
+        }
+        if ($order->status === 'pending') {
+            return Response::error("Order {$orderNumber} is unpaid (status: pending) — nothing has been charged.");
         }
 
         $refundedCents = $order->refunds->sum('amount_cents');
         $remainingCents = $order->total_cents - $refundedCents;
+        if ($remainingCents <= 0) {
+            return Response::error("Order {$orderNumber} is already fully refunded — double refunds are refused.");
+        }
+
         $amountCents = $request->integer('amount_cents') ?: $remainingCents;
+        if ($amountCents <= 0) {
+            return Response::error('Refund amount must be a positive number of cents.');
+        }
+        if ($amountCents > self::MAX_REFUND_CENTS) {
+            return Response::error(sprintf(
+                'Refund exceeds the $%.2f per-call cap — larger refunds need a human operator.',
+                self::MAX_REFUND_CENTS / 100
+            ));
+        }
+        if ($amountCents > $remainingCents) {
+            return Response::error(sprintf(
+                'Only $%.2f is still refundable on %s — refused to refund $%.2f.',
+                $remainingCents / 100,
+                $orderNumber,
+                $amountCents / 100
+            ));
+        }
 
         $refund = $order->refunds()->create([
             'amount_cents' => $amountCents,
             'reason' => $request->string('reason') ?: null,
-            'idempotency_key' => 'mcp-'.bin2hex(random_bytes(8)),
+            'idempotency_key' => $key !== '' ? $key : 'mcp-'.bin2hex(random_bytes(8)),
             'status' => 'processed',
             'processed_at' => now(),
         ]);

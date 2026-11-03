@@ -40,7 +40,7 @@ class RefundApproveCommand extends Command
         McpAudit::record('refund:approve', ['refund_id' => $refund->id], sprintf(
             'approved request #%d — $%.2f on %s',
             $refund->id, $refund->amount_cents / 100, $refund->order?->number
-        ));
+        ), 'human-operator');
 
         $this->info("Approved #{$refund->id}: \${$this->dollars($refund->amount_cents)} on {$refund->order?->number}. issue-refund can now execute it.");
 

@@ -78,3 +78,24 @@ npx @modelcontextprotocol/inspector \
 
 The server's `#[Instructions]` warn every connecting agent that names are NOT
 unique — the seed data is built to test that.
+
+## Part 2 — destructive mutations (PR #2)
+
+Part 2 hands the agent a refund button — and then takes away its ability to
+use it alone. `#[IsDestructive]` is only a hint (Antigravity ignored it), so
+the confirmation is enforced server-side with a two-phase flow:
+
+| tool / command | who runs it | what it does |
+|---|---|---|
+| `request-refund` | the agent | drafts a `pending` refund request — moves no money |
+| `php artisan refund:requests` | **you** | lists requests awaiting review |
+| `php artisan refund:approve {id}` | **you** | the human signature — `issue-refund` refuses without it |
+| `php artisan refund:reject {id}` | **you** | rejects the draft |
+| `issue-refund` | the agent | executes approved requests only, at the approved amount |
+
+Every call — drafts, approvals, executions, refusals, even idempotent
+replays — writes a row to `mcp_audit_log` with the actor that made it
+(`local-agent` for tool calls, `human-operator` for artisan approvals).
+
+Try it: ask the agent to refund `AS-1052` — it will draft the request but the
+execution refuses until you run `php artisan refund:approve {id}` yourself.

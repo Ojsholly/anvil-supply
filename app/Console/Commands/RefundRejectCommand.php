@@ -36,7 +36,7 @@ class RefundRejectCommand extends Command
         McpAudit::record('refund:reject', ['refund_id' => $refund->id, 'reason' => $reason], sprintf(
             'rejected request #%d — $%.2f on %s',
             $refund->id, $refund->amount_cents / 100, $refund->order?->number
-        ));
+        ), 'human-operator');
 
         $this->info("Rejected #{$refund->id} on {$refund->order?->number}.");
 

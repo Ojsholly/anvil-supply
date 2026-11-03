@@ -11,12 +11,12 @@ use Illuminate\Support\Facades\DB;
  */
 class McpAudit
 {
-    public static function record(string $tool, array $arguments, string $resultSummary): void
+    public static function record(string $tool, array $arguments, string $resultSummary, string $actor = 'local-agent'): void
     {
         DB::table('mcp_audit_log')->insert([
             'tool' => $tool,
             'arguments' => json_encode($arguments),
-            'actor' => 'local-agent',
+            'actor' => $actor,
             'result_summary' => $resultSummary,
             'created_at' => now(),
             'updated_at' => now(),

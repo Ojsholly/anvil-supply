@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Mcp\Support\McpAudit;
 use App\Models\Product;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
@@ -32,7 +33,7 @@ class CheckInventoryTool extends Tool
             ->get();
 
         if ($products->isEmpty()) {
-            \App\Mcp\Support\McpAudit::record('check-inventory', $request->all(), '0 products matched');
+            McpAudit::record('check-inventory', $request->all(), '0 products matched');
 
             return Response::text('No products matched.');
         }
@@ -46,7 +47,7 @@ class CheckInventoryTool extends Tool
             $p->active ? '' : ' (discontinued)',
         ));
 
-        \App\Mcp\Support\McpAudit::record('check-inventory', $request->all(), $products->count().' product(s) matched');
+        McpAudit::record('check-inventory', $request->all(), $products->count().' product(s) matched');
 
         return Response::text($lines->join("\n"));
     }

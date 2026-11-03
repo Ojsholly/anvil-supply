@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Mcp\Support\McpAudit;
 use App\Models\Order;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
@@ -51,7 +52,7 @@ class RequestRefundTool extends Tool
 
         $pending = $order->refunds->where('status', 'pending')->first();
         if ($pending) {
-            \App\Mcp\Support\McpAudit::record('request-refund', $request->all(), "reused pending request #{$pending->id} on {$orderNumber}");
+            McpAudit::record('request-refund', $request->all(), "reused pending request #{$pending->id} on {$orderNumber}");
 
             return Response::text(sprintf(
                 'A pending refund request already exists for %s — request #%d for $%.2f. It awaits human approval (`php artisan refund:approve %d`).',
@@ -75,7 +76,7 @@ class RequestRefundTool extends Tool
             'processed_at' => null,
         ]);
 
-        \App\Mcp\Support\McpAudit::record('request-refund', $request->all(), "drafted request #{$refund->id} for \${$this->dollars($amountCents)} on {$orderNumber}");
+        McpAudit::record('request-refund', $request->all(), "drafted request #{$refund->id} for \${$this->dollars($amountCents)} on {$orderNumber}");
 
         return Response::text(sprintf(
             'Refund request #%d drafted for %s: $%.2f. A human must approve it — `php artisan refund:approve %d` — before issue-refund will execute.',
@@ -91,7 +92,7 @@ class RequestRefundTool extends Tool
     // Refusals are audited too — a drafted-then-refused request leaves a row.
     protected function deny(string $orderNumber, array $arguments, string $message): Response
     {
-        \App\Mcp\Support\McpAudit::record('request-refund', $arguments, 'refused: '.$message);
+        McpAudit::record('request-refund', $arguments, 'refused: '.$message);
 
         return Response::error($message);
     }

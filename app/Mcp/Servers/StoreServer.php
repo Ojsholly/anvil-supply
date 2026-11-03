@@ -2,6 +2,13 @@
 
 namespace App\Mcp\Servers;
 
+use App\Mcp\Tools\CheckInventoryTool;
+use App\Mcp\Tools\GetCustomerTool;
+use App\Mcp\Tools\GetOrderTool;
+use App\Mcp\Tools\GetTopCustomersTool;
+use App\Mcp\Tools\IssueRefundTool;
+use App\Mcp\Tools\RequestRefundTool;
+use App\Mcp\Tools\SearchOrdersTool;
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
@@ -31,13 +38,13 @@ class StoreServer extends Server
      * @var array<int, class-string>
      */
     protected array $tools = [
-        \App\Mcp\Tools\SearchOrdersTool::class,
-        \App\Mcp\Tools\GetOrderTool::class,
-        \App\Mcp\Tools\GetCustomerTool::class,
-        \App\Mcp\Tools\CheckInventoryTool::class,
-        \App\Mcp\Tools\GetTopCustomersTool::class,
-        \App\Mcp\Tools\RequestRefundTool::class,
-        \App\Mcp\Tools\IssueRefundTool::class,
+        SearchOrdersTool::class,
+        GetOrderTool::class,
+        GetCustomerTool::class,
+        CheckInventoryTool::class,
+        GetTopCustomersTool::class,
+        RequestRefundTool::class,
+        IssueRefundTool::class,
     ];
 
     protected array $resources = [

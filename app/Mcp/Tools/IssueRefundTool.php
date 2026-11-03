@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Mcp\Support\McpAudit;
 use App\Models\Order;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
@@ -51,7 +52,7 @@ class IssueRefundTool extends Tool
             // record — the executed row IS the idempotency record.
             $processed = $order->refunds->where('status', 'processed')->sortByDesc('processed_at')->first();
             if ($processed) {
-                \App\Mcp\Support\McpAudit::record('issue-refund', $request->all(), "idempotent replay — refund #{$processed->id} already processed");
+                McpAudit::record('issue-refund', $request->all(), "idempotent replay — refund #{$processed->id} already processed");
 
                 return Response::text(sprintf(
                     'Idempotent replay — refund #%d for $%.2f on %s was already processed. To refund more, draft a new request with request-refund and have a human approve it.',
@@ -72,7 +73,7 @@ class IssueRefundTool extends Tool
             $order->update(['status' => 'refunded']);
         }
 
-        \App\Mcp\Support\McpAudit::record('issue-refund', $request->all(), sprintf(
+        McpAudit::record('issue-refund', $request->all(), sprintf(
             'refunded $%.2f on %s (refund #%d, approved by %s)',
             $approved->amount_cents / 100, $orderNumber, $approved->id, $approved->approved_by
         ));
@@ -91,7 +92,7 @@ class IssueRefundTool extends Tool
     // leaves a row, not silence.
     protected function deny(string $orderNumber, array $arguments, string $message): Response
     {
-        \App\Mcp\Support\McpAudit::record('issue-refund', $arguments, 'refused: '.$message);
+        McpAudit::record('issue-refund', $arguments, 'refused: '.$message);
 
         return Response::error($message);
     }

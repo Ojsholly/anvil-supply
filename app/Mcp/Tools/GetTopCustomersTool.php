@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Mcp\Support\McpAudit;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Illuminate\Support\Facades\DB;
@@ -45,11 +46,11 @@ class GetTopCustomersTool extends Tool
             ->get();
 
         if ($rows->isEmpty()) {
-            \App\Mcp\Support\McpAudit::record('get-top-customers', $request->all(), '0 customers with orders');
+            McpAudit::record('get-top-customers', $request->all(), '0 customers with orders');
 
-            \App\Mcp\Support\McpAudit::record('get-top-customers', $request->all(), $rows->count().' customer(s) ranked');
+            McpAudit::record('get-top-customers', $request->all(), $rows->count().' customer(s) ranked');
 
-        return Response::text('No customers with orders found.');
+            return Response::text('No customers with orders found.');
         }
 
         $lines = $rows->values()->map(fn ($r, $i) => sprintf(

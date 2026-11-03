@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Mcp\Support\McpAudit;
 use App\Models\Customer;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
@@ -32,7 +33,7 @@ class GetCustomerTool extends Tool
             ->get();
 
         if ($customers->isEmpty()) {
-            \App\Mcp\Support\McpAudit::record('get-customer', $request->all(), '0 customers matched');
+            McpAudit::record('get-customer', $request->all(), '0 customers matched');
 
             return Response::text('No customers matched.');
         }
@@ -51,7 +52,7 @@ class GetCustomerTool extends Tool
             ? $customers->count()." matches — disambiguate before answering:\n"
             : '';
 
-        \App\Mcp\Support\McpAudit::record('get-customer', $request->all(), $customers->count().' customer(s) matched');
+        McpAudit::record('get-customer', $request->all(), $customers->count().' customer(s) matched');
 
         return Response::text($prefix.$lines->join("\n"));
     }

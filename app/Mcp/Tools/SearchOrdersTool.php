@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Mcp\Support\McpAudit;
 use App\Models\Order;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
@@ -37,7 +38,7 @@ class SearchOrdersTool extends Tool
             ->get();
 
         if ($orders->isEmpty()) {
-            \App\Mcp\Support\McpAudit::record('search-orders', $request->all(), '0 orders matched');
+            McpAudit::record('search-orders', $request->all(), '0 orders matched');
 
             return Response::text('No orders matched that search.');
         }
@@ -52,7 +53,7 @@ class SearchOrdersTool extends Tool
             $o->placed_at?->toDateString() ?? 'unplaced',
         ));
 
-        \App\Mcp\Support\McpAudit::record('search-orders', $request->all(), $orders->count().' order(s) matched');
+        McpAudit::record('search-orders', $request->all(), $orders->count().' order(s) matched');
 
         return Response::text($lines->join("\n"));
     }

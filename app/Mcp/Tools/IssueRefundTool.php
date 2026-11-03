@@ -44,6 +44,11 @@ class IssueRefundTool extends Tool
         if ($key !== '') {
             $existing = $order->refunds->firstWhere('idempotency_key', $key);
             if ($existing) {
+                \App\Mcp\Support\McpAudit::record('issue-refund', $request->all(), sprintf(
+                    'idempotent replay — refund #%d already recorded, no second charge',
+                    $existing->id
+                ));
+
                 return Response::text(sprintf(
                     'Idempotent replay — refund #%d for $%.2f on %s was already recorded. No second charge.',
                     $existing->id,

@@ -48,10 +48,10 @@ class GetTopCustomersTool extends Tool
         if ($rows->isEmpty()) {
             McpAudit::record('get-top-customers', $request->all(), '0 customers with orders');
 
-            McpAudit::record('get-top-customers', $request->all(), $rows->count().' customer(s) ranked');
-
             return Response::text('No customers with orders found.');
         }
+
+        McpAudit::record('get-top-customers', $request->all(), $rows->count().' customer(s) ranked');
 
         $lines = $rows->values()->map(fn ($r, $i) => sprintf(
             '#%d %s%s <%s> — %d order(s) · gross $%.2f · net $%.2f%s',

@@ -10,11 +10,13 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 // Lookup key — tools/call addresses the tool by this string.
 #[Name('get-customer')]
 // What the model reads to decide whether this tool answers its question.
 #[Description('Look up customers by name or email. Names are NOT unique — this tool may return several people; always confirm which one is meant (company or email) before reporting their orders.')]
+#[IsReadOnly]
 class GetCustomerTool extends Tool
 {
     /**
@@ -30,6 +32,8 @@ class GetCustomerTool extends Tool
             ->get();
 
         if ($customers->isEmpty()) {
+            \App\Mcp\Support\McpAudit::record('get-customer', $request->all(), '0 customers matched');
+
             return Response::text('No customers matched.');
         }
 
@@ -46,6 +50,8 @@ class GetCustomerTool extends Tool
         $prefix = $customers->count() > 1
             ? $customers->count()." matches — disambiguate before answering:\n"
             : '';
+
+        \App\Mcp\Support\McpAudit::record('get-customer', $request->all(), $customers->count().' customer(s) matched');
 
         return Response::text($prefix.$lines->join("\n"));
     }

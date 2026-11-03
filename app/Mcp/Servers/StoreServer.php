@@ -36,6 +36,8 @@ class StoreServer extends Server
         \App\Mcp\Tools\GetCustomerTool::class,
         \App\Mcp\Tools\CheckInventoryTool::class,
         \App\Mcp\Tools\GetTopCustomersTool::class,
+        \App\Mcp\Tools\RequestRefundTool::class,
+        \App\Mcp\Tools\IssueRefundTool::class,
     ];
 
     protected array $resources = [

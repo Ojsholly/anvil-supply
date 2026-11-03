@@ -10,11 +10,13 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 // Lookup key — tools/call addresses the tool by this string.
 #[Name('get-order')]
 // What the model reads to decide whether this tool answers its question.
 #[Description('Get the full detail of one order by order number: customer, line items, totals, status, shipping date, and any refunds issued.')]
+#[IsReadOnly]
 class GetOrderTool extends Tool
 {
     /**
@@ -27,6 +29,8 @@ class GetOrderTool extends Tool
             ->first();
 
         if (! $order) {
+            \App\Mcp\Support\McpAudit::record('get-order', $request->all(), "not found: {$request->string('order_number')}");
+
             return Response::text("No order found for number {$request->string('order_number')}. Check the format — order numbers look like AS-1044.");
         }
 
@@ -60,6 +64,8 @@ class GetOrderTool extends Tool
                 $refund->reason ?? 'no reason recorded',
             );
         }
+
+        \App\Mcp\Support\McpAudit::record('get-order', $request->all(), "order {$order->number} returned");
 
         return Response::text(implode("\n", $lines));
     }

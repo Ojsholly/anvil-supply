@@ -10,11 +10,13 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 // Lookup key — tools/call addresses the tool by this string.
 #[Name('get-top-customers')]
 // What the model reads to decide whether this tool answers its question.
 #[Description('Rank customers by total spend. Returns order count, gross spend (all orders), and net spend (excludes cancelled and refunded orders) per customer. Use for leaderboard, "top customer", or spend-ranking questions.')]
+#[IsReadOnly]
 class GetTopCustomersTool extends Tool
 {
     /**
@@ -43,7 +45,11 @@ class GetTopCustomersTool extends Tool
             ->get();
 
         if ($rows->isEmpty()) {
-            return Response::text('No customers with orders found.');
+            \App\Mcp\Support\McpAudit::record('get-top-customers', $request->all(), '0 customers with orders');
+
+            \App\Mcp\Support\McpAudit::record('get-top-customers', $request->all(), $rows->count().' customer(s) ranked');
+
+        return Response::text('No customers with orders found.');
         }
 
         $lines = $rows->values()->map(fn ($r, $i) => sprintf(

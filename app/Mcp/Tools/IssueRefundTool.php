@@ -14,23 +14,22 @@ use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
 
 // Lookup key — tools/call addresses the tool by this string.
 #[Name('issue-refund')]
-// What the model reads to decide whether this tool answers its question.
-#[Description('Issue a refund for an order by order number. Optionally takes amount_cents (defaults to the remaining refundable balance), a reason, and an idempotency_key to make repeat calls safe.')]
-// Marks the tool destructive — clients should confirm with a human before calling.
+// Executes ONLY human-approved refund requests — the agent can draft
+// (request-refund) and execute, but cannot approve.
+#[Description('Execute a refund that a human operator has approved via `php artisan refund:approve`. Refuses if no approved request exists for the order — approvals are out-of-band, not arguments.')]
+// Marks the tool destructive — advisory metadata; clients may ignore it.
 #[IsDestructive]
 class IssueRefundTool extends Tool
 {
-    // Server-side hard cap per call — the client confirm-click is a
-    // courtesy; this check is the boundary.
-    public const MAX_REFUND_CENTS = 50000; // $500
-
     /**
      * The only code that executes on a call — eloquent in, text out.
-     * Every refusal path returns Response::error() so the model
-     * reads it as a failed call, not a successful answer.
+     * The boundary is the approved_at timestamp: no human signature,
+     * no money movement — and that field can't be set through MCP.
      */
     public function handle(Request $request): Response
     {
+        $request->validate(['order_number' => 'required|string']);
+
         $orderNumber = (string) $request->string('order_number');
         $order = Order::with('refunds')->where('number', $orderNumber)->first();
 
@@ -38,86 +37,57 @@ class IssueRefundTool extends Tool
             return $this->deny($orderNumber, $request->all(), "No order found for number {$orderNumber}.");
         }
 
-        // A repeat call carrying a key the client already used replays the
-        // stored refund instead of charging the customer a second time.
-        $key = (string) $request->string('idempotency_key');
-        if ($key !== '') {
-            $existing = $order->refunds->firstWhere('idempotency_key', $key);
-            if ($existing) {
-                \App\Mcp\Support\McpAudit::record('issue-refund', $request->all(), sprintf(
-                    'idempotent replay — refund #%d already recorded, no second charge',
-                    $existing->id
-                ));
+        // The executor needs an approved request. Pending ≠ approved —
+        // a human's approved_at timestamp is the difference.
+        $pending = $order->refunds->where('status', 'pending')->first();
+        $approved = $order->refunds->where('status', 'approved')->first();
+
+        if (! $approved) {
+            if ($pending) {
+                return $this->deny($orderNumber, $request->all(), "Refund request #{$pending->id} for {$orderNumber} is still pending — no human has approved it. Run `php artisan refund:approve {$pending->id}` first.");
+            }
+
+            // A re-call after the request already processed replays the
+            // record — the executed row IS the idempotency record.
+            $processed = $order->refunds->where('status', 'processed')->sortByDesc('processed_at')->first();
+            if ($processed) {
+                \App\Mcp\Support\McpAudit::record('issue-refund', $request->all(), "idempotent replay — refund #{$processed->id} already processed");
 
                 return Response::text(sprintf(
-                    'Idempotent replay — refund #%d for $%.2f on %s was already recorded. No second charge.',
-                    $existing->id,
-                    $existing->amount_cents / 100,
-                    $orderNumber
+                    'Idempotent replay — refund #%d for $%.2f on %s was already processed. To refund more, draft a new request with request-refund and have a human approve it.',
+                    $processed->id, $processed->amount_cents / 100, $orderNumber
                 ));
             }
+
+            return $this->deny($orderNumber, $request->all(), "No approved refund request exists for {$orderNumber}. Draft one with request-refund, then a human approves it out-of-band.");
         }
 
-        // Status guardrails — what the server itself refuses.
-        if ($order->status === 'cancelled') {
-            return $this->deny($orderNumber, $request->all(), "Order {$orderNumber} is cancelled — it was never charged, nothing to refund.");
-        }
-        if ($order->status === 'pending') {
-            return $this->deny($orderNumber, $request->all(), "Order {$orderNumber} is unpaid (status: pending) — nothing has been charged.");
-        }
-
-        $refundedCents = $order->refunds->sum('amount_cents');
-        $remainingCents = $order->total_cents - $refundedCents;
-        if ($remainingCents <= 0) {
-            return $this->deny($orderNumber, $request->all(), "Order {$orderNumber} is already fully refunded — double refunds are refused.");
-        }
-
-        $amountCents = $request->integer('amount_cents') ?: $remainingCents;
-        if ($amountCents <= 0) {
-            return $this->deny($orderNumber, $request->all(), 'Refund amount must be a positive number of cents.');
-        }
-        if ($amountCents > self::MAX_REFUND_CENTS) {
-            return $this->deny($orderNumber, $request->all(), sprintf(
-                'Refund exceeds the $%.2f per-call cap — larger refunds need a human operator.',
-                self::MAX_REFUND_CENTS / 100
-            ));
-        }
-        if ($amountCents > $remainingCents) {
-            return $this->deny($orderNumber, $request->all(), sprintf(
-                'Only $%.2f is still refundable on %s — refused to refund $%.2f.',
-                $remainingCents / 100,
-                $orderNumber,
-                $amountCents / 100
-            ));
-        }
-
-        $refund = $order->refunds()->create([
-            'amount_cents' => $amountCents,
-            'reason' => $request->string('reason') ?: null,
-            'idempotency_key' => $key !== '' ? $key : 'mcp-'.bin2hex(random_bytes(8)),
+        $approved->update([
             'status' => 'processed',
             'processed_at' => now(),
         ]);
 
-        if ($refundedCents + $amountCents >= $order->total_cents) {
+        $processedCents = $order->refunds->where('status', 'processed')->sum('amount_cents');
+        if ($processedCents >= $order->total_cents) {
             $order->update(['status' => 'refunded']);
         }
 
         \App\Mcp\Support\McpAudit::record('issue-refund', $request->all(), sprintf(
-            'refunded $%.2f on %s (refund #%d)',
-            $amountCents / 100, $orderNumber, $refund->id
+            'refunded $%.2f on %s (refund #%d, approved by %s)',
+            $approved->amount_cents / 100, $orderNumber, $approved->id, $approved->approved_by
         ));
 
         return Response::text(sprintf(
-            'Refund $%.2f recorded on %s (refund #%d). %s',
-            $amountCents / 100,
-            $order->number,
-            $refund->id,
+            'Refund $%.2f processed on %s (refund #%d, approved by %s). %s',
+            $approved->amount_cents / 100,
+            $orderNumber,
+            $approved->id,
+            $approved->approved_by,
             $order->status === 'refunded' ? 'Order fully refunded.' : 'Partial refund — order status unchanged.'
         ));
     }
 
-    // Refusals are audited too — an over-cap or double-refund attempt
+    // Refusals are audited too — an unapproved execution attempt
     // leaves a row, not silence.
     protected function deny(string $orderNumber, array $arguments, string $message): Response
     {
@@ -127,8 +97,8 @@ class IssueRefundTool extends Tool
     }
 
     /**
-     * Becomes the tool's inputSchema — arguments are validated
-     * against this before handle() runs.
+     * Becomes the tool's inputSchema — amount is intentionally absent:
+     * the executor can't set it, only the approved request carries it.
      *
      * @return array<string, Type>
      */
@@ -138,12 +108,6 @@ class IssueRefundTool extends Tool
             'order_number' => $schema->string()
                 ->description('Full order number, e.g. "AS-1050".')
                 ->required(),
-            'amount_cents' => $schema->integer()
-                ->description('Refund amount in cents. Omit to refund the remaining refundable balance.'),
-            'reason' => $schema->string()
-                ->description('Reason recorded on the refund, e.g. "damaged on arrival".'),
-            'idempotency_key' => $schema->string()
-                ->description('Optional client key — repeat calls with the same key are safe.'),
         ];
     }
 }

@@ -10,11 +10,13 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 // Lookup key — tools/call addresses the tool by this string.
 #[Name('search-orders')]
 // What the model reads to decide whether this tool answers its question.
 #[Description('Search orders by order number, customer name/email, or status. Returns a compact list; use get-order for full detail on one order.')]
+#[IsReadOnly]
 class SearchOrdersTool extends Tool
 {
     /**

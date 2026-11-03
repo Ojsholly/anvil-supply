@@ -10,11 +10,13 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 // Lookup key — tools/call addresses the tool by this string.
 #[Name('check-inventory')]
 // What the model reads to decide whether this tool answers its question.
 #[Description('Check stock and price for products by SKU or name fragment. Returns live inventory counts.')]
+#[IsReadOnly]
 class CheckInventoryTool extends Tool
 {
     /**

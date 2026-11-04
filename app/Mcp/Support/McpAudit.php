@@ -11,15 +11,26 @@ use Illuminate\Support\Facades\DB;
  */
 class McpAudit
 {
-    public static function record(string $tool, array $arguments, string $resultSummary, string $actor = 'local-agent'): void
+    public static function record(string $tool, array $arguments, string $resultSummary, ?string $actor = null): void
     {
         DB::table('mcp_audit_log')->insert([
             'tool' => $tool,
             'arguments' => json_encode($arguments),
-            'actor' => $actor,
+            'actor' => $actor ?? static::resolveActor(),
             'result_summary' => $resultSummary,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    /**
+     * Who made this call. Over stdio there is no HTTP request, so the actor
+     * stays the 'local-agent' label. Over the web transport the OAuth token
+     * resolves a real user — the ledger stops recording a label and starts
+     * naming a person.
+     */
+    protected static function resolveActor(): string
+    {
+        return request()->user()?->email ?? 'local-agent';
     }
 }

@@ -2,6 +2,14 @@
 
 namespace App\Mcp\Servers;
 
+use App\Mcp\Tools\CheckInventoryTool;
+use App\Mcp\Tools\GetAuditLogTool;
+use App\Mcp\Tools\GetCustomerTool;
+use App\Mcp\Tools\GetOrderTool;
+use App\Mcp\Tools\GetTopCustomersTool;
+use App\Mcp\Tools\IssueRefundTool;
+use App\Mcp\Tools\RequestRefundTool;
+use App\Mcp\Tools\SearchOrdersTool;
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
@@ -21,6 +29,8 @@ use Laravel\Mcp\Server\Attributes\Version;
       confirm which person you mean by company or email.
     - Order numbers look like "AS-1044".
     - Money is returned in cents; quote dollars to the customer.
+    - The audit ledger is readable via get-audit-log — prefer it over
+      guessing what earlier calls did.
     TXT)]
 class StoreServer extends Server
 {
@@ -31,11 +41,14 @@ class StoreServer extends Server
      * @var array<int, class-string>
      */
     protected array $tools = [
-        \App\Mcp\Tools\SearchOrdersTool::class,
-        \App\Mcp\Tools\GetOrderTool::class,
-        \App\Mcp\Tools\GetCustomerTool::class,
-        \App\Mcp\Tools\CheckInventoryTool::class,
-        \App\Mcp\Tools\GetTopCustomersTool::class,
+        SearchOrdersTool::class,
+        GetOrderTool::class,
+        GetCustomerTool::class,
+        CheckInventoryTool::class,
+        GetTopCustomersTool::class,
+        RequestRefundTool::class,
+        IssueRefundTool::class,
+        GetAuditLogTool::class,
     ];
 
     protected array $resources = [

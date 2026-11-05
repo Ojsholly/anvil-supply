@@ -42,6 +42,13 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        // Bearer-token guard for the MCP HTTP transport — Passport validates
+        // the OAuth access token and resolves the consenting user.
+        'api' => [
+            'driver' => 'passport',
+            'provider' => 'users',
+        ],
     ],
 
     /*

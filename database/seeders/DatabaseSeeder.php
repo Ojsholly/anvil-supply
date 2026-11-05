@@ -27,7 +27,7 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Amara Okafor',  'email' => 'a.okafor@delta-fab.example',         'company' => 'Delta Fabrication',     'phone' => '+234 555-0163'],
             ['name' => 'Chen Wei',      'email' => 'chen.wei@westport.example',          'company' => 'Westport Machine Shop', 'phone' => '+1 555-0139'],
             ['name' => 'Priya Nair',    'email' => 'priya.nair@nullfield.example',       'company' => 'Nullfield Studios',     'phone' => null,
-              'notes' => 'Asked twice for invoices by fax. Do not fax.'],
+                'notes' => 'Asked twice for invoices by fax. Do not fax.'],
         ])->map(fn ($c) => Customer::create($c));
 
         $products = collect([
